@@ -1,0 +1,35 @@
+{:paths ["src"]
+ :deps {io.github.kotoba-lang/org-ietf-jcs
+        {:git/url "https://github.com/kotoba-lang/org-ietf-jcs.git"
+         :git/sha "480b62c805870dbcd0aa9b50d2dd69d0ad08f351"}
+        io.github.kotoba-lang/io-multiformats
+        {:git/url "https://github.com/kotoba-lang/io-multiformats.git"
+         :git/sha "bbddb14908d39999a2523979ad9f5d46ec8a612d"}
+        io.github.kotoba-lang/org-ietf-ed25519
+        {:git/url "https://github.com/kotoba-lang/org-ietf-ed25519.git"
+         :git/sha "6117bf17fceef4f95e33e6db2e0daa25553c0f0e"}
+        ;; `eddsa-jcs-2022` — the only cryptosuite did:webvh 1.0 admits, and the
+        ;; one place in this fleet that implements it algorithm for algorithm.
+        io.github.kotoba-lang/org-w3-vc-data-integrity
+        {:git/url "https://github.com/kotoba-lang/org-w3-vc-data-integrity.git"
+         :git/sha "02004c9d3fd42575e7c64ade5ca13778bb630c59"}
+        io.github.kotoba-lang/org-w3-did
+        {:git/url "https://github.com/kotoba-lang/org-w3-did.git"
+         :git/sha "accf098a0e30d912753cd1967949f98616899a36"}}
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps {io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+         :main-opts ["-m" "cognitect.test-runner"]
+         :exec-fn cognitect.test-runner.api/test}
+  :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
+         :main-opts ["-m" "clj-kondo.main" "--lint" "src" "test"
+                     "--fail-level" "error"]}
+  ;; West/sibling workspace development only. Release and CI never use this.
+  :dev {:override-deps
+        {io.github.kotoba-lang/org-ietf-jcs {:local/root "../org-ietf-jcs"}
+         io.github.kotoba-lang/io-multiformats {:local/root "../io-multiformats"}
+         io.github.kotoba-lang/org-ietf-ed25519 {:local/root "../org-ietf-ed25519"}
+         io.github.kotoba-lang/org-w3-vc-data-integrity
+         {:local/root "../org-w3-vc-data-integrity"}
+         io.github.kotoba-lang/org-w3-did {:local/root "../org-w3-did"}}}}}
