@@ -128,16 +128,27 @@ resolve. `weight` defaults to 1, so the shape above is plain 3-of-5.
 section by section. SHA-256 only (multihash `0x12`), read off the multihash
 prefix rather than assumed.
 
-## Test
+## Test — on both runtimes, because `.cljc` is a claim about two
 
 ```bash
-clojure -M:test          # or -M:dev:test against sibling west checkouts
+clojure -M:test          # JVM  (or -M:dev:test against sibling west checkouts)
+npm install && npm run test:nbb   # ClojureScript, via nbb
 ```
 
-23 tests, 52 assertions. Every negative breaks exactly one rule and re-runs the
-positive unbroken; the suite has been mutation-tested (disable the witness
-threshold, the pre-rotation commitment, or the portability check, and only the
-tests naming those rules go red).
+25 tests, 59 assertions, identical on both. Every negative breaks exactly one
+rule and re-runs the positive unbroken; the suite has been mutation-tested
+(disable the witness threshold, the pre-rotation commitment, or the
+portability check, and only the tests naming those rules go red).
+
+**Running the second runtime found two real bugs the first could not.** Both
+primitives branch at the reader — `multiformats.core/sha256` is MessageDigest
+on the JVM and @noble/hashes in JS; `ed25519.core` is JCA and node:crypto — and
+so does character handling. `(int c)` is a code point on the JVM and a numeric
+coercion in ClojureScript, so `(int "3")` is 3 and `(int "a")` is 0. Under cljs
+that made percent-decoding produce garbage, and made `ascii?` — the guard that
+REFUSES a non-ASCII domain rather than punycoding it wrongly — answer true for
+every input, silently. A refusal that cannot fire looks exactly like an input
+that passed.
 
 ## License
 

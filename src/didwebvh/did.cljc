@@ -37,8 +37,21 @@
   (into #{} (concat (map char (range 97 123)) (map char (range 65 91))
                     (map char (range 48 58)) [\- \. \_ \~])))
 
+(defn- char-code
+  "The code point of a one-character value.
+
+   `(int c)` is NOT this. On the JVM it is the code point; in ClojureScript a
+   character is a one-character STRING and `int` coerces it numerically, so
+   `(int \"3\")` is 3 and `(int \"a\")` is 0. Both readings are plausible and
+   both compile, which is why this went unnoticed until the suite was run on
+   the second runtime: percent-decoding produced garbage, and `ascii?` -- the
+   guard that refuses a non-ASCII domain rather than punycoding it wrongly --
+   answered true for EVERY input, silently."
+  [c]
+  #?(:clj (int ^char c) :cljs (.charCodeAt (str c) 0)))
+
 (defn- hex-value [c]
-  (let [n (int c)]
+  (let [n (char-code c)]
     (cond (<= 48 n 57) (- n 48)
           (<= 65 n 70) (- n 55)
           (<= 97 n 102) (- n 87)
@@ -84,7 +97,7 @@
        (str (char b))
        (str "%" (hex2 b))))))
 
-(defn- ascii? [s] (every? #(< (int %) 128) s))
+(defn- ascii? [s] (every? #(< (char-code %) 128) s))
 
 (defn- ipv4? [host]
   (boolean (re-matches #"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}" host)))

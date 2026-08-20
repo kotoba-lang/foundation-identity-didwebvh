@@ -15,7 +15,16 @@
 
 ;; ── fixtures ─────────────────────────────────────────────────────────────────
 
-(defn- seed [n] (byte-array (map unchecked-byte (repeat 32 n))))
+(defn- seed [n]
+  #?(:clj (byte-array (map unchecked-byte (repeat 32 n)))
+     :cljs (js/Uint8Array.from (clj->js (repeat 32 n)))))
+
+(defn- threw?
+  "A thrown-exception assertion that reads the same on both runtimes. The
+   `thrown?` form does not, and a test that only compiles on one runtime is a
+   test that only runs on one."
+  [f]
+  (try (f) false (catch #?(:clj Exception :cljs :default) _ true)))
 
 (def update-1 (signer/from-seed (seed 1)))
 (def update-2 (signer/from-seed (seed 2)))
@@ -86,8 +95,31 @@
       (is (= (str "did:webvh:" scid ":example.com%3A3000:path")
              (did/build {:scid scid :domain "example.com" :port 3000 :path ["path"]}))))
     (testing "what it refuses"
-      (is (thrown? Exception (did/parse (str "did:webvh:" scid ":192.0.2.1"))))
-      (is (thrown? Exception (did/parse (str "did:webvh:" scid ":example.com:..")))))))
+      (is (threw? #(did/parse (str "did:webvh:" scid ":192.0.2.1"))))
+      (is (threw? #(did/parse (str "did:webvh:" scid ":example.com:..")))))))
+
+(deftest a-non-ascii-domain-is-refused-rather-than-punycoded
+  ;; This is the assertion that was missing when the ClojureScript run first
+  ;; happened, and its absence is why the bug it now covers was invisible:
+  ;; `ascii?` compared `(int c)`, which is a code point on the JVM and a
+  ;; numeric coercion in JS, so under cljs EVERY domain looked ASCII and this
+  ;; guard never fired. A refusal that cannot fire is indistinguishable from a
+  ;; domain that passed.
+  (let [scid (get-in (genesis-entry) ["parameters" "scid"])]
+    (is (threw? #(did/parse (str "did:webvh:" scid ":例え.jp"))))
+    (is (map? (did/parse (str "did:webvh:" scid ":xn--r8jz45g.jp")))
+        "the A-label form is what a caller is expected to hold, and it passes")))
+
+(deftest percent-decoding-happens-once-and-gets-the-bytes-right
+  ;; The other half of the same defect: `hex-value` read its digits through
+  ;; `(int c)` too, so under cljs `%3A` decoded to nonsense instead of a colon
+  ;; and every ported DID with a port was mis-parsed.
+  (is (= "example.com:3000" (did/percent-decode "example.com%3A3000")))
+  (is (= "acme" (did/percent-decode "acme")))
+  (is (= "%2F" (did/percent-decode "%252F"))
+      "decoding runs ONCE -- twice is how a path segment smuggles a separator")
+  (is (= "%E4%BE%8B" (did/percent-encode "例")) "multi-byte, uppercase hex")
+  (is (= "例" (did/percent-decode (did/percent-encode "例")))))
 
 ;; ── the happy path ───────────────────────────────────────────────────────────
 
@@ -303,8 +335,7 @@
          (h/key-hash (:multikey update-2)))))
 
 (deftest witness-validation-refuses-an-unreachable-threshold
-  (is (thrown? Exception
-               (witness/validate! {"threshold" 6 "witnesses" (get witness-param "witnesses")})))
+  (is (threw? #(witness/validate! {"threshold" 6 "witnesses" (get witness-param "witnesses")})))
   (is (nil? (witness/validate! witness-param)))
   (is (nil? (witness/validate! {})) "declaring no witnesses is legal"))
 
