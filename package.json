@@ -2,9 +2,7 @@
   "name": "@kotoba-lang/foundation-identity-didwebvh",
   "private": true,
   "scripts": {
-    "test:nbb": "nbb --classpath src:test:../org-ietf-jcs/src:../io-multiformats/src:../org-ietf-ed25519/src:../org-w3-vc-data-integrity/src:../org-w3-did/src run-nbb-tests.cljs"
+    "test:nbb": "nbb --classpath src:test:../org-ietf-jcs/src:../io-multiformats/src:../org-nist-sha2/src:../org-ietf-ed25519/src:../org-w3-vc-data-integrity/src:../org-w3-did/src run-nbb-tests.cljs"
   },
-  "dependencies": {
-    "@noble/hashes": "2.0.1"
-  }
+  "dependencies": {}
 }
