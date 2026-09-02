@@ -11,7 +11,7 @@
    already a separate machine. An organization's update key belongs somewhere
    this function cannot reach: that is the point of the seam."
   (:require [data-integrity.eddsa :as eddsa]
-            [ed25519.core :as ed]
+            [ed25519.sign :as ed]
             [multiformats.core :as mf]))
 
 (defn multikey
@@ -30,7 +30,7 @@
 (defn from-seed
   "`{:multikey :sign-fn :public-key :did-key}` for a raw 32-byte seed."
   [seed]
-  (let [pub (ed/pubkey-from-seed seed)]
+  (let [pub (ed/public-key seed)]
     {:multikey (multikey pub)
      :did-key (did-key pub)
      :public-key pub
