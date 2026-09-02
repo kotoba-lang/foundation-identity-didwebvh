@@ -15,7 +15,8 @@
    sequence, entry hash, versionTime, parameters (including pre-rotation),
    the entry proof against the ACTIVE updateKeys, the SCID (first entry),
    `state.id` and portability, and the witness threshold."
-  (:require [didwebvh.did :as did]
+  (:require [data-integrity.bytes :as b]
+            [didwebvh.did :as did]
             [didwebvh.entry :as entry]
             [didwebvh.hash :as h]
             [didwebvh.params :as params]
@@ -63,6 +64,10 @@
      :clock-skew-seconds  defaults to `default-clock-skew-seconds`.
      :expect-did    the DID that was resolved. Given, the last entry's
                     `state.id` must equal it.
+     :verify-signature  replaces the Ed25519 check (see `didwebvh.proof/verify`).
+                    Everything else here is arithmetic on the document, so this
+                    is the one seam a platform verifier needs. `verify-async`
+                    below is what drives an asynchronous one.
 
    On success returns `{:ok? true :did :scid :state :parameters :versions
    :deactivated? :portable? :log-url :witness-url :checked-future-dating?}`.
@@ -70,8 +75,12 @@
    return the document, and returning it beside a boolean invites a caller to
    use it anyway."
   ([entries] (verify entries {}))
-  ([entries {:keys [witness-file now expect-did clock-skew-seconds]}]
-   (let [skew (or clock-skew-seconds default-clock-skew-seconds)]
+  ([entries {:keys [witness-file now expect-did clock-skew-seconds verify-signature]}]
+   (let [skew (or clock-skew-seconds default-clock-skew-seconds)
+         ;; Built rather than passed straight through: a literal
+         ;; `:verify-signature nil` would shadow `proof/verify`'s own default
+         ;; and call nil as a function.
+         proof-opts (if verify-signature {:verify-signature verify-signature} {})]
      (if-not (and (sequential? entries) (seq entries))
        {:ok? false :error :didwebvh/empty-log :message "a DID log has at least one entry"}
        (loop [index 0
@@ -161,12 +170,14 @@
                             (:didwebvh/error (ex-data active*) :didwebvh/bad-parameters)
                             (ex-message active*) {:data (ex-data active*)})
                        (let [signed (entry/proof-input e)
-                             verdicts (mapv #(proof/verify signed % {:allowed (:authorized-keys active*)})
+                             verdicts (mapv #(proof/verify signed % (assoc proof-opts :allowed
+                                                                        (:authorized-keys active*)))
                                             proofs)
                              effective-witness (if (witness/configured? (:witness active*))
                                                  (:witness active*)
                                                  (or (:witness active) {}))
-                             witness-result (witness/verify effective-witness version-id witness-file)
+                             witness-result (witness/verify effective-witness version-id witness-file
+                                                           proof-opts)
                              did-string (get state "id")
                              parsed (try (did/parse did-string)
                                          (catch #?(:clj Exception :cljs :default) _ nil))
@@ -222,3 +233,61 @@
   "The state at a particular versionId from a verified result, or nil."
   [verified version-id]
   (some #(when (= version-id (:version-id %)) (:state %)) (:versions verified)))
+
+;; ── driving an asynchronous verifier ─────────────────────────────────────────
+;;
+;; `verify` is a loop that must decide each entry before it can know which keys
+;; are authorized for the next one, so it cannot await anything. What it CAN do
+;; is answer the same questions twice: once optimistically, to find out which
+;; signatures matter, and once for real.
+;;
+;; The optimistic pass says `true` to every signature, which can only let the
+;; loop travel FURTHER than the real answers would -- every check that consumes
+;; a verdict either continues or stops, and `true` is the continuing side. So
+;; the questions it asks are a superset of the questions the real pass asks,
+;; and running the identical code path both times is what keeps the two from
+;; drifting apart. The price is one extra pass of JCS canonicalization and
+;; SHA-256, which is microseconds beside the Ed25519 it removes.
+
+#?(:cljs
+   (defn- hex [x]
+     (apply str (map #(.padStart (.toString (bit-and % 0xff) 16) 2 "0") (b/->ints x)))))
+
+#?(:cljs
+   (defn- signature-key [public-key hash-data signature]
+     (str (hex public-key) "." (hex hash-data) "." (hex signature))))
+
+#?(:cljs
+   (defn verify-async
+     "`verify`, with the Ed25519 checks moved onto an asynchronous verifier.
+
+      `:verify-signature-async` is `(fn [public-key hash-data signature] ->
+      Promise<boolean>)` -- `didwebvh.subtle/verify-signature` is the WebCrypto
+      one. Everything else in `opts` is `verify`'s.
+
+      Returns a Promise of exactly what `verify` returns. It REJECTS if the
+      verifier rejects: a verifier that could not run has not decided that the
+      signature is bad, and answering `false` there would report a valid log as
+      forged. A caller must therefore distinguish a rejected promise (this
+      resolver could not verify) from an `{:ok? false}` result (this log does
+      not verify)."
+     [entries {:keys [verify-signature-async] :as opts}]
+     (if-not (fn? verify-signature-async)
+       (js/Promise.reject (js/Error. "verify-async needs :verify-signature-async"))
+       (let [asked (atom {})
+             collect (fn [public-key hash-data signature]
+                       (swap! asked assoc (signature-key public-key hash-data signature)
+                              [public-key hash-data signature])
+                       true)]
+         (verify entries (assoc opts :verify-signature collect))
+         (let [questions (vec @asked)]
+           (-> (js/Promise.all
+                (into-array (map (fn [[_ [pk hd sg]]] (verify-signature-async pk hd sg)) questions)))
+               (.then (fn [answers]
+                        (let [table (zipmap (map first questions)
+                                            (map boolean (array-seq answers)))]
+                          (verify entries
+                                  (assoc opts :verify-signature
+                                         (fn [public-key hash-data signature]
+                                           (boolean (get table (signature-key public-key hash-data
+                                                                              signature)))))))))))))))

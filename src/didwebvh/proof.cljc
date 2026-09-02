@@ -90,8 +90,17 @@
    `:allowed`, when given, is the set of multikeys authorized to make this
    proof -- the ACTIVE `updateKeys` for a log entry, or one witness's key for
    a witness proof. Omitting it verifies the signature and says nothing about
-   authority, which is only ever useful in a test."
-  [unsecured proof {:keys [allowed]}]
+   authority, which is only ever useful in a test.
+
+   `:verify-signature` replaces the Ed25519 check itself: `(fn [public-key
+   hash-data signature] -> boolean)`, defaulting to the suite's own. Every
+   check EXCEPT this one is pure arithmetic on the document, so substituting
+   here -- a platform verifier, a memo table, a counter -- moves the only
+   expensive part without touching the rules. It must return a boolean, not a
+   Promise: `didwebvh.log/verify-async` is how an asynchronous verifier is
+   driven, and it drives it by answering the questions first."
+  [unsecured proof {:keys [allowed verify-signature]
+                    :or {verify-signature eddsa/verify-hash-data}}]
   (try
     (let [mk (multikey-of (get proof "verificationMethod"))]
       (cond
@@ -122,7 +131,7 @@
               hash-data (eddsa/hash-data transformed config)
               signature (eddsa/decode-proof-value (get proof "proofValue"))
               pub (didkey/did-key->public-key (str "did:key:" mk))]
-          (if (eddsa/verify-hash-data pub hash-data signature)
+          (if (verify-signature pub hash-data signature)
             {:ok? true :multikey mk}
             {:ok? false :error :didwebvh/bad-signature :multikey mk
              :message "the signature does not verify under the named key"}))))
