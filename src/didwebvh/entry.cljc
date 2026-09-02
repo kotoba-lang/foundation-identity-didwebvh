@@ -135,3 +135,25 @@
   [version-id {:keys [multikey sign-fn created]}]
   (proof/create {"versionId" version-id}
                 {:multikey multikey :sign-fn sign-fn :created created}))
+
+#?(:cljs
+   (defn sign-async
+     "`sign` for a signer whose `sign-fn` returns a Promise of the signature
+      (WebCrypto, a KMS). Returns a Promise of the signed entry. The entry it
+      produces is byte-for-byte what `sign` produces with the same key; see
+      `didwebvh.proof/create-async`."
+     [entry {:keys [multikey sign-fn created] :as signer}]
+     (when-not (and (string? multikey) (fn? sign-fn))
+       (fail! :didwebvh/bad-signer "a signer is {:multikey string :sign-fn fn}" {:signer (keys signer)}))
+     (-> (proof/create-async (proof-input entry)
+                             {:multikey multikey
+                              :sign-fn sign-fn
+                              :created (or created (get entry "versionTime"))})
+         (.then (fn [p] (assoc entry "proof" [p]))))))
+
+#?(:cljs
+   (defn witness-proof-async
+     "`witness-proof` for a Promise-returning signer."
+     [version-id {:keys [multikey sign-fn created]}]
+     (proof/create-async {"versionId" version-id}
+                         {:multikey multikey :sign-fn sign-fn :created created})))

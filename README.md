@@ -104,6 +104,17 @@ resolve. `weight` defaults to 1, so the shape above is plain 3-of-5.
    the current holder). With pre-rotation it is this entry's own set, which is
    admissible only because the previous entry committed to their hashes.
 
+## Signing where the key must not be in this process
+
+`entry/sign-async` and `entry/witness-proof-async` (ClojureScript only) take
+a signer whose `sign-fn` returns a Promise of the signature — WebCrypto's
+`crypto.subtle.sign` over a non-extractable key, a KMS, an HSM behind a
+call. They produce byte-for-byte the entry `sign` produces with the same key
+(Ed25519 is deterministic; `test/didwebvh/async_test.cljs` asserts the
+equality against Node's WebCrypto). A Cloudflare Worker uses this path: the
+pure signer costs about half a second per signature there, WebCrypto
+milliseconds, and the private key never leaves the platform.
+
 ## What this library does NOT do
 
 - **No fetching.** The log, the witness file and `now` are arguments. That is

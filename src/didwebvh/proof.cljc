@@ -58,6 +58,28 @@
         signature (sign-fn hash-data)]
     (assoc options "proofValue" (eddsa/encode-proof-value signature))))
 
+#?(:cljs
+   (defn create-async
+     "`create` for a signer whose `sign-fn` returns a Promise of the 64-byte
+      signature — WebCrypto's `crypto.subtle.sign`, a KMS, an HSM behind an
+      HTTP call. Returns a Promise of the proof. Everything but the signature
+      is computed exactly as `create` computes it, so the two produce the
+      same proof for the same key; the difference is only where the private
+      key may live. ClojureScript only: the JVM has synchronous signers and
+      no Promise."
+     [unsecured {:keys [multikey sign-fn created]}]
+     (let [options (cond-> {"type" proof-type
+                            "cryptosuite" cryptosuite
+                            "verificationMethod" (verification-method multikey)
+                            "proofPurpose" proof-purpose}
+                     created (assoc "created" created))
+           config (eddsa/proof-configuration options)
+           transformed (eddsa/transform unsecured options)
+           hash-data (eddsa/hash-data transformed config)]
+       (-> (js/Promise.resolve (sign-fn hash-data))
+           (.then (fn [signature]
+                    (assoc options "proofValue" (eddsa/encode-proof-value signature))))))))
+
 (defn verify
   "Verify one proof over `unsecured`.
 
