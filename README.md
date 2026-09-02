@@ -115,6 +115,40 @@ equality against Node's WebCrypto). A Cloudflare Worker uses this path: the
 pure signer costs about half a second per signature there, WebCrypto
 milliseconds, and the private key never leaves the platform.
 
+## Verifying where the Ed25519 must not be in this process
+
+`log/verify` is one pure loop, and it cannot await anything: each entry has to
+be decided before the next entry's authorized keys are known. So the
+asynchronous path answers the same questions twice.
+
+```clojure
+(require '[didwebvh.log :as log] '[didwebvh.subtle :as subtle])
+
+(log/verify-async entries {:witness-file wf :expect-did did :now now
+                           :verify-signature-async subtle/verify-signature})
+;; => Promise of exactly what `verify` returns
+```
+
+`verify-async` runs `verify` once with a collector that says **true** to every
+signature, which can only let the loop travel further than the real answers
+would; the questions it gathers are therefore a superset of the ones that
+matter. It answers them all in parallel, then runs the identical loop again
+with the real verdicts. Running the same code path both times is what keeps
+the two from drifting; the price is one extra pass of JCS and SHA-256, which
+is microseconds beside the Ed25519 it removes. In a Worker that is a few
+milliseconds per signature instead of a few hundred.
+
+Every check except the signature is arithmetic on the document, so
+`:verify-signature` — `(fn [public-key hash-data signature] -> boolean)` — is
+the only seam this needs, and `proof/verify`, `witness/verify` and `verify`
+all take it. A memo table, a counter or a platform verifier substitutes there.
+
+**A verifier that could not run has not decided that a signature is bad.**
+`didwebvh.subtle` maps no error to `false`, and `verify-async` rejects rather
+than returning `{:ok? false}`, because reporting a valid log as forged
+because Ed25519 was unavailable is the worse failure of the two. Callers must
+distinguish a rejected promise from an `{:ok? false}` result.
+
 ## What this library does NOT do
 
 - **No fetching.** The log, the witness file and `now` are arguments. That is

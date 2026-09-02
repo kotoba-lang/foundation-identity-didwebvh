@@ -93,8 +93,13 @@
    Returns `{:ok? bool :weight n :threshold n :approved [ids] :rejected [{}]}`.
    A witness counts once, however many proofs it filed, and only if at least
    one of them verifies under ITS OWN key -- a proof signed by some other key
-   is not that witness's approval no matter which array it sits in."
-  [witness version-id witness-file]
+   is not that witness's approval no matter which array it sits in.
+
+   `opts` is passed to `didwebvh.proof/verify`; `:verify-signature` is the
+   only key that means anything here (`:allowed` is this function's own
+   answer and is not the caller's to give)."
+  ([witness version-id witness-file] (verify witness version-id witness-file {}))
+  ([witness version-id witness-file opts]
   (if-not (configured? witness)
     {:ok? true :weight 0 :threshold 0 :approved [] :rejected []}
     (let [proofs (proofs-for witness-file version-id)
@@ -103,7 +108,7 @@
           (for [w (get witness "witnesses")
                 :let [id (get w "id")
                       mk (subs id (count "did:key:"))
-                      verdicts (map #(proof/verify doc % {:allowed #{mk}}) (or proofs []))
+                      verdicts (map #(proof/verify doc % (assoc opts :allowed #{mk})) (or proofs []))
                       ok (some :ok? verdicts)]]
             {:id id :weight (weight-of w) :ok? (boolean ok)
              :reasons (vec (remove nil? (map :error verdicts)))})
@@ -114,4 +119,4 @@
        :weight weight
        :threshold threshold
        :approved (mapv :id approved)
-       :rejected (vec (remove :ok? results))})))
+       :rejected (vec (remove :ok? results))}))))

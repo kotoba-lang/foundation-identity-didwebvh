@@ -343,3 +343,39 @@
   (is (= t0 (t/->iso8601 (t/parse t0))))
   (is (= (t/parse "2026-08-20T00:00:00Z") (t/parse "2026-08-20T00:00:00.500Z")))
   (is (nil? (t/parse "2026-08-20T00:00:00+09:00")) "the method requires UTC"))
+
+;; ── the signature check as a seam ────────────────────────────────────────────
+;;
+;; These use injected verifiers and never touch Ed25519, which is why they are
+;; cheap enough to state both directions. That the DEFAULT verifier is correct
+;; is what every other test in this file measures.
+
+(deftest the-signature-check-is-a-seam-and-the-seam-is-load-bearing
+  (let [e (genesis-entry)
+        wf (witness-file-for (get e "versionId") witnesses)
+        base {:witness-file wf :now now}
+        ;; A real 64-byte signature by a witness over a different document:
+        ;; well-formed, decodes, and does not verify here.
+        forged (assoc-in e ["proof" 0 "proofValue"] (get-in wf [0 "proof" 1 "proofValue"]))]
+    (testing "a verifier that refuses every signature refuses the log"
+      (is (= :didwebvh/unauthorized-entry
+             (:error (log/verify [e] (assoc base :verify-signature (constantly false)))))))
+    (testing "a verifier that accepts every signature accepts a log with a forged proof"
+      (is (:ok? (log/verify [forged] (assoc base :verify-signature (constantly true))))
+          "so the seam is what decided it, not some other check"))
+    (testing "the seam is asked once for the entry proof and once per witness"
+      (let [asked (atom [])
+            counting (fn [pub hash-data sig]
+                       (swap! asked conj [(count (vec pub)) (count (vec hash-data)) (count (vec sig))])
+                       true)]
+        (is (:ok? (log/verify [e] (assoc base :verify-signature counting))))
+        (is (= 6 (count @asked)) "one entry proof plus five witness proofs")
+        (is (every? #(= [32 64 64] %) @asked)
+            "public key, hashData and signature reach the seam at their real lengths")))
+    (testing "witness proofs go through the same seam"
+      (let [ubytes (fn [x] (mapv #(bit-and (int %) 0xff) (seq x)))
+            ;; true for the entry proof's key, false for every witness's
+            only-entry (fn [pub _ _] (= (ubytes pub) (ubytes (:public-key update-1))))]
+        (is (= :didwebvh/witness-threshold-unmet
+               (:error (log/verify [e] (assoc base :verify-signature only-entry)))))))))
+
