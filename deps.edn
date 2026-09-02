@@ -7,12 +7,12 @@
          :git/sha "561fe7dfada3db852b127f06d41750dabd3cead9"}
         io.github.kotoba-lang/org-ietf-ed25519
         {:git/url "https://github.com/kotoba-lang/org-ietf-ed25519.git"
-         :git/sha "6117bf17fceef4f95e33e6db2e0daa25553c0f0e"}
+         :git/sha "c0b11c5ffe25d42f29b3f6a3d2d2317331e75336"}
         ;; `eddsa-jcs-2022` — the only cryptosuite did:webvh 1.0 admits, and the
         ;; one place in this fleet that implements it algorithm for algorithm.
         io.github.kotoba-lang/org-w3-vc-data-integrity
         {:git/url "https://github.com/kotoba-lang/org-w3-vc-data-integrity.git"
-         :git/sha "02004c9d3fd42575e7c64ade5ca13778bb630c59"}
+         :git/sha "34364263f08fd8fe5ccb566612a0ef35ce159061"}
         io.github.kotoba-lang/org-w3-did
         {:git/url "https://github.com/kotoba-lang/org-w3-did.git"
          :git/sha "accf098a0e30d912753cd1967949f98616899a36"}}
