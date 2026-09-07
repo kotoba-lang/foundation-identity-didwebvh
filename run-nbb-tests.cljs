@@ -12,18 +12,33 @@
    `deftest`: cljs.test's `async` needs report plumbing this harness does not
    carry, and a run containing one returns nil -- the shape of \"nothing ran\".
 
+   THE EXIT CODE DOES NOT COME FROM THE RETURN VALUE OF `run-tests`. Under
+   nbb that value is nil (measured 2026-09-07), so destructuring `:fail`
+   /`:error`/`:test` from it yields nil for every key, `(zero? nil)` is
+   false, and `(+ nil nil n)` is `n` -- a suite that fails (or runs nothing)
+   exits 0 with the failures still on the screen. The exit code comes instead
+   from the `:end-run-tests` report hook, which cljs.test DOES dispatch with
+   the real summary as the map (measured 2026-09-07: the event is
+   `{:test N :pass N :fail N :error N :type :end-run-tests}`).
+
    Exits 2 when nothing ran. A harness that reports success for zero tests is
    the failure this file exists to avoid: it looks exactly like a pass."
   (:require [clojure.test :as t]
             [didwebvh.async-test :as async-test]
             [didwebvh.conformance-test]))
 
-(let [{:keys [fail error test]} (t/run-tests 'didwebvh.conformance-test)]
-  (when (zero? test)
-    (println "no tests ran -- refusing to report a pass")
-    (js/process.exit 2))
-  (println "async signing check (WebCrypto vs the pure signer)…")
-  (-> (async-test/run)
-      (.then (fn [async-failures]
-               (println (str "async check: " async-failures " failed"))
-               (js/process.exit (if (pos? (+ fail error async-failures)) 1 0))))))
+(let [summary (atom nil)]
+  (defmethod t/report [:cljs.test/default :end-run-tests] [m]
+    (reset! summary m))
+
+  (t/run-tests 'didwebvh.conformance-test)
+
+  (let [{:keys [test fail error]} @summary]
+    (when (or (nil? test) (zero? test))
+      (println "no tests ran -- refusing to report a pass")
+      (js/process.exit 2))
+    (println "async signing check (WebCrypto vs the pure signer)…")
+    (-> (async-test/run)
+        (.then (fn [async-failures]
+                 (println (str "async check: " async-failures " failed"))
+                 (js/process.exit (if (pos? (+ fail error async-failures)) 1 0)))))))
