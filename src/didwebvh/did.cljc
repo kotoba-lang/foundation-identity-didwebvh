@@ -21,7 +21,7 @@
    an IDNA2008 implementation that is approximately right maps two different
    names onto one URL, and the failure surfaces as somebody else's DID
    document. Callers hold the A-label."
-  (:require [clojure.string :as str])
+  (:require [kotoba.lang.text :as str])
   #?(:clj (:import [java.nio.charset StandardCharsets])))
 
 (def prefix "did:webvh:")
@@ -83,7 +83,7 @@
        out))))
 
 (defn- hex2 [b]
-  (let [h (str/upper-case #?(:clj (Integer/toString b 16) :cljs (.toString b 16)))]
+  (let [h (str/upper #?(:clj (Integer/toString b 16) :cljs (.toString b 16)))]
     (if (= 1 (count h)) (str "0" h) h)))
 
 (defn percent-encode

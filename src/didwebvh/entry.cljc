@@ -16,7 +16,7 @@
    calculate the entry hash, set `versionId` to `<n>-<entryHash>`, and only
    THEN sign. A proof taken over the pre-hash form would verify against an
    entry whose versionId nobody had committed to."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [didwebvh.hash :as h]
             [didwebvh.proof :as proof]))
 
