@@ -25,7 +25,7 @@
 
    The file is a JSON ARRAY of `{\"versionId\", \"proof\"}` objects published
    beside the log as `did-witness.json` (see `didwebvh.did/witness-url`)."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [didwebvh.proof :as proof]))
 
 (defn- fail! [code msg data]

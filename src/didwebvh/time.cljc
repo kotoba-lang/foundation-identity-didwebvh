@@ -11,7 +11,7 @@
    String comparison is not used, deliberately. `2025-01-23T04:12:36Z` and
    `2025-01-23T04:12:36.000Z` name the same instant and do not compare equal
    as text, so a log that alternates the two forms would look non-monotonic."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (def ^:private iso-re
   #"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|\+00:00)$")

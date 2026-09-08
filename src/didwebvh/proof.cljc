@@ -12,7 +12,7 @@
    64-byte-signature-from-hash shape, so an HSM or KMS signer substitutes
    without this library ever holding a seed -- which is the whole point of
    putting an organization's update key in one."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [data-integrity.eddsa :as eddsa]
             [did.core :as didkey]))
 

@@ -3,7 +3,7 @@
    positive alongside it is re-run unbroken. A test that reaches the right
    `:error` for the wrong reason -- a malformed document, a reader that threw
    -- is the failure mode this suite is written against."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [clojure.test :refer [deftest is testing]]
             [didwebvh.did :as did]
             [didwebvh.entry :as entry]
