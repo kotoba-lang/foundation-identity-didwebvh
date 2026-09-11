@@ -176,7 +176,7 @@ prefix rather than assumed.
 ## Test — on both runtimes, because `.cljc` is a claim about two
 
 ```bash
-clojure -M:test          # JVM  (or -M:dev:test against sibling west checkouts)
+kbb -M:test          # JVM  (or -M:dev:test against sibling west checkouts)
 npm install && npm run test:nbb   # ClojureScript, via nbb
 ```
 
