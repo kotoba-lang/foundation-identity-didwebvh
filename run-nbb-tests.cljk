@@ -23,7 +23,7 @@
 
    Exits 2 when nothing ran. A harness that reports success for zero tests is
    the failure this file exists to avoid: it looks exactly like a pass."
-  (:require [clojure.test :as t]
+  (:require [kotoba.test :as t]
             [didwebvh.async-test :as async-test]
             [didwebvh.conformance-test]))
 
