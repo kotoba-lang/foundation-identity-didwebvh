@@ -4,7 +4,7 @@
    `:error` for the wrong reason -- a malformed document, a reader that threw
    -- is the failure mode this suite is written against."
   (:require [kotoba.lang.text :as str]
-            [clojure.test :refer [deftest is testing]]
+            [kotoba.test :refer [deftest is testing]]
             [didwebvh.did :as did]
             [didwebvh.entry :as entry]
             [didwebvh.hash :as h]
