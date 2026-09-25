@@ -21,8 +21,7 @@
    an IDNA2008 implementation that is approximately right maps two different
    names onto one URL, and the failure surfaces as somebody else's DID
    document. Callers hold the A-label."
-  (:require [kotoba.lang.text :as str])
-  #?(:clj (:import [java.nio.charset StandardCharsets])))
+  (:require [kotoba.bytes :as kbytes] [kotoba.lang.text :as str]))
 
 (def prefix "did:webvh:")
 
@@ -58,11 +57,11 @@
           :else nil)))
 
 (defn- string->bytes [s]
-  #?(:clj (map #(bit-and (int %) 0xff) (seq (.getBytes ^String s StandardCharsets/UTF_8)))
+  #?(:clj (map #(bit-and (int %) 0xff) (seq (kbytes/utf8-bytes ^String s)))
      :cljs (array-seq (.encode (js/TextEncoder.) s))))
 
 (defn- bytes->string [bs]
-  #?(:clj (String. (byte-array (map unchecked-byte bs)) StandardCharsets/UTF_8)
+  #?(:clj (kbytes/utf8-string (byte-array (map unchecked-byte bs)))
      :cljs (.decode (js/TextDecoder. "utf-8") (js/Uint8Array.from (clj->js (vec bs))))))
 
 (defn percent-decode
